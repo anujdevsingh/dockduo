@@ -23,11 +23,15 @@ tracing = "0.1"
 once_cell = "1"
 
 [target.'cfg(windows)'.dependencies.windows]
-version = "0.60"
+version = "0.61"
 features = [
   "Win32_Foundation",
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_HiDpi",
   "Win32_Graphics_Gdi",
+  "Win32_Graphics_Dwm",
 ]
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"

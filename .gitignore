@@ -30,3 +30,11 @@ src-tauri/WixTools/
 
 # Claude local
 .claude/
+
+# Upstream reference (not part of build)
+lil-agents-main/
+scripts/raw-assets/
+
+# Intermediate sprite conversion frames
+_MConverter.eu_walk-bruce-01/
+_MConverter.eu_walk-jazz-01/

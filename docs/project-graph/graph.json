@@ -1,0 +1,542 @@
+{
+  "metadata": {
+    "project": "dockduo",
+    "generated_on": "2026-04-19",
+    "generator": "Codex fallback graphify pass",
+    "scope": {
+      "included": [
+        "src/**",
+        "src-tauri/src/**",
+        "src-tauri/tauri.conf.json",
+        "src-tauri/Cargo.toml",
+        "scripts/convert-sprites.mjs",
+        "docs/DockDuo-BuildPlan.md",
+        "public/**"
+      ],
+      "excluded": [
+        "node_modules/**",
+        "src-tauri/target/**"
+      ]
+    },
+    "summary": {
+      "current_state": "Phase 1 foundation with animated overlay prototype pieces already present",
+      "frontend_stack": [
+        "React 19",
+        "TypeScript",
+        "Vite 7"
+      ],
+      "backend_stack": [
+        "Tauri 2",
+        "Rust",
+        "windows-rs",
+        "WebView2"
+      ]
+    }
+  },
+  "communities": [
+    {
+      "id": "frontend-overlay",
+      "label": "Frontend Overlay Runtime",
+      "description": "Browser-side entrypoint, overlay view, character animation, store, and CSS."
+    },
+    {
+      "id": "tauri-backend",
+      "label": "Tauri and Win32 Backend",
+      "description": "Rust-side commands, overlay window control, taskbar detection, and event emission."
+    },
+    {
+      "id": "assets-pipeline",
+      "label": "Sprite and Audio Asset Pipeline",
+      "description": "Imported upstream assets, converted sprite sheets, and public runtime assets."
+    },
+    {
+      "id": "spec-roadmap",
+      "label": "Roadmap and Planned Systems",
+      "description": "Build-plan nodes that explain what is intended but not yet implemented."
+    }
+  ],
+  "nodes": [
+    {
+      "id": "repo:dockduo",
+      "type": "repository",
+      "label": "DockDuo",
+      "status": "current",
+      "community": "spec-roadmap",
+      "path": ".",
+      "summary": "Windows desktop companion app with a transparent overlay above the taskbar."
+    },
+    {
+      "id": "doc:build-plan",
+      "type": "document",
+      "label": "DockDuo Build Plan",
+      "status": "current",
+      "community": "spec-roadmap",
+      "path": "docs/DockDuo-BuildPlan.md",
+      "summary": "Large execution spec describing the intended Lil Agents for Windows feature set and phases."
+    },
+    {
+      "id": "config:package-json",
+      "type": "config",
+      "label": "package.json",
+      "status": "current",
+      "community": "frontend-overlay",
+      "path": "package.json",
+      "summary": "Defines the React, Vite, and Tauri JS dependency set plus build scripts."
+    },
+    {
+      "id": "config:vite",
+      "type": "config",
+      "label": "vite.config.ts",
+      "status": "current",
+      "community": "frontend-overlay",
+      "path": "vite.config.ts",
+      "summary": "Pins the Tauri dev server to port 1420 and ignores src-tauri file watching."
+    },
+    {
+      "id": "config:tauri",
+      "type": "config",
+      "label": "tauri.conf.json",
+      "status": "current",
+      "community": "tauri-backend",
+      "path": "src-tauri/tauri.conf.json",
+      "summary": "Defines a single transparent overlay window plus NSIS bundle settings."
+    },
+    {
+      "id": "frontend:main",
+      "type": "entrypoint",
+      "label": "Frontend Entrypoint",
+      "status": "current",
+      "community": "frontend-overlay",
+      "path": "src/main.tsx",
+      "summary": "Routes by query string and currently renders only the overlay window."
+    },
+    {
+      "id": "window:overlay",
+      "type": "window",
+      "label": "Overlay Window",
+      "status": "current",
+      "community": "frontend-overlay",
+      "path": "src/windows/Overlay.tsx",
+      "summary": "Fetches taskbar info, listens for taskbar changes, and renders Bruce and Jazz."
+    },
+    {
+      "id": "component:character",
+      "type": "component",
+      "label": "Character",
+      "status": "current",
+      "community": "frontend-overlay",
+      "path": "src/components/Character.tsx",
+      "summary": "Drives sprite animation, movement, bubble text, click hitboxes, and hover-triggered cursor pass-through."
+    },
+    {
+      "id": "store:app-store",
+      "type": "store",
+      "label": "App Store",
+      "status": "current",
+      "community": "frontend-overlay",
+      "path": "src/store/appStore.ts",
+      "summary": "Tiny external store for AI status and per-character bounds."
+    },
+    {
+      "id": "domain:sprites",
+      "type": "domain",
+      "label": "Sprite Runtime Constants",
+      "status": "current",
+      "community": "frontend-overlay",
+      "path": "src/lib/sprites.ts",
+      "summary": "Defines character ids, frame geometry, movement timing, phrases, and completion sounds."
+    },
+    {
+      "id": "styles:global",
+      "type": "style",
+      "label": "Global CSS",
+      "status": "current",
+      "community": "frontend-overlay",
+      "path": "src/styles/global.css",
+      "summary": "Forces transparent HTML and body rendering for the overlay WebView."
+    },
+    {
+      "id": "backend:main",
+      "type": "entrypoint",
+      "label": "Rust Binary Entrypoint",
+      "status": "current",
+      "community": "tauri-backend",
+      "path": "src-tauri/src/main.rs",
+      "summary": "Minimal binary that calls dockduo_lib::run()."
+    },
+    {
+      "id": "backend:lib",
+      "type": "module",
+      "label": "Rust Library Entrypoint",
+      "status": "current",
+      "community": "tauri-backend",
+      "path": "src-tauri/src/lib.rs",
+      "summary": "Registers Tauri commands, configures the overlay, and starts taskbar polling."
+    },
+    {
+      "id": "backend:overlay",
+      "type": "module",
+      "label": "Overlay Module",
+      "status": "current",
+      "community": "tauri-backend",
+      "path": "src-tauri/src/overlay.rs",
+      "summary": "Applies transparent window behavior and positions the overlay against taskbar geometry."
+    },
+    {
+      "id": "backend:taskbar",
+      "type": "module",
+      "label": "Taskbar Module",
+      "status": "current",
+      "community": "tauri-backend",
+      "path": "src-tauri/src/taskbar.rs",
+      "summary": "Detects taskbar edge, rect, monitor, DPI, and emits taskbar-changed events."
+    },
+    {
+      "id": "ipc:get-taskbar-info",
+      "type": "command",
+      "label": "get_taskbar_info",
+      "status": "current",
+      "community": "tauri-backend",
+      "path": "src-tauri/src/lib.rs",
+      "summary": "Returns the latest taskbar snapshot to the frontend."
+    },
+    {
+      "id": "ipc:set-ignore-cursor-events",
+      "type": "command",
+      "label": "set_ignore_cursor_events",
+      "status": "current",
+      "community": "tauri-backend",
+      "path": "src-tauri/src/lib.rs",
+      "summary": "Toggles overlay click-through behavior on the named window."
+    },
+    {
+      "id": "event:taskbar-changed",
+      "type": "event",
+      "label": "taskbar-changed",
+      "status": "current",
+      "community": "tauri-backend",
+      "path": "src-tauri/src/taskbar.rs",
+      "summary": "Broadcast event fired whenever observed taskbar state changes."
+    },
+    {
+      "id": "script:convert-sprites",
+      "type": "script",
+      "label": "convert-sprites.mjs",
+      "status": "current",
+      "community": "assets-pipeline",
+      "path": "scripts/convert-sprites.mjs",
+      "summary": "Builds transparent sprite sheets from PNG sequences and copies upstream sound and icon assets."
+    },
+    {
+      "id": "asset:runtime-public",
+      "type": "asset-group",
+      "label": "Public Runtime Assets",
+      "status": "current",
+      "community": "assets-pipeline",
+      "path": "public/",
+      "summary": "Served sprite sheets, sound effects, and bubble icon used by the overlay runtime."
+    },
+    {
+      "id": "asset:source-frames",
+      "type": "asset-group",
+      "label": "Raw Frame Sequences",
+      "status": "current",
+      "community": "assets-pipeline",
+      "path": "_MConverter.eu_walk-bruce-01 and _MConverter.eu_walk-jazz-01",
+      "summary": "Intermediate PNG frame dumps used to build the runtime sprite sheets."
+    },
+    {
+      "id": "upstream:lil-agents",
+      "type": "external-source",
+      "label": "Upstream Lil Agents Assets",
+      "status": "current",
+      "community": "assets-pipeline",
+      "path": "lil-agents-main/LilAgents",
+      "summary": "Imported upstream project used as the asset and behavior reference."
+    },
+    {
+      "id": "planned:terminal-window",
+      "type": "planned-module",
+      "label": "Terminal Window",
+      "status": "planned",
+      "community": "spec-roadmap",
+      "path": "planned src/windows/Terminal.tsx",
+      "summary": "Future xterm.js terminal popover per character, described in the build plan but absent in code."
+    },
+    {
+      "id": "planned:pty-manager",
+      "type": "planned-module",
+      "label": "PTY Manager",
+      "status": "planned",
+      "community": "spec-roadmap",
+      "path": "planned src-tauri/src/terminal.rs",
+      "summary": "Future backend module for spawning and managing AI CLI sessions."
+    },
+    {
+      "id": "planned:providers",
+      "type": "planned-module",
+      "label": "CLI Provider Detection",
+      "status": "planned",
+      "community": "spec-roadmap",
+      "path": "planned src-tauri/src/providers.rs",
+      "summary": "Future provider registry for Codex, Claude, Copilot, and Gemini CLI support."
+    },
+    {
+      "id": "planned:tray-config",
+      "type": "planned-module",
+      "label": "Tray and Config",
+      "status": "planned",
+      "community": "spec-roadmap",
+      "path": "planned src-tauri/src/tray.rs and config.rs",
+      "summary": "Future system tray control surface and persisted settings."
+    },
+    {
+      "id": "planned:onboarding",
+      "type": "planned-module",
+      "label": "Onboarding Flow",
+      "status": "planned",
+      "community": "spec-roadmap",
+      "path": "planned src/components/Onboarding.tsx",
+      "summary": "Future first-run modal for CLI detection and theme selection."
+    }
+  ],
+  "edges": [
+    {
+      "source": "repo:dockduo",
+      "target": "doc:build-plan",
+      "type": "guided-by",
+      "evidence": "docs/DockDuo-BuildPlan.md"
+    },
+    {
+      "source": "repo:dockduo",
+      "target": "config:package-json",
+      "type": "configured-by",
+      "evidence": "package.json"
+    },
+    {
+      "source": "repo:dockduo",
+      "target": "config:tauri",
+      "type": "configured-by",
+      "evidence": "src-tauri/tauri.conf.json"
+    },
+    {
+      "source": "config:package-json",
+      "target": "frontend:main",
+      "type": "boots",
+      "evidence": "vite and tauri scripts"
+    },
+    {
+      "source": "config:vite",
+      "target": "frontend:main",
+      "type": "serves",
+      "evidence": "dev server on port 1420"
+    },
+    {
+      "source": "config:tauri",
+      "target": "window:overlay",
+      "type": "declares-window",
+      "evidence": "overlay window definition"
+    },
+    {
+      "source": "frontend:main",
+      "target": "window:overlay",
+      "type": "routes-to",
+      "evidence": "window query string dispatch"
+    },
+    {
+      "source": "window:overlay",
+      "target": "component:character",
+      "type": "renders",
+      "evidence": "Bruce and Jazz components"
+    },
+    {
+      "source": "window:overlay",
+      "target": "ipc:get-taskbar-info",
+      "type": "invokes",
+      "evidence": "invoke(\"get_taskbar_info\")"
+    },
+    {
+      "source": "window:overlay",
+      "target": "event:taskbar-changed",
+      "type": "subscribes-to",
+      "evidence": "listen(\"taskbar-changed\")"
+    },
+    {
+      "source": "window:overlay",
+      "target": "store:app-store",
+      "type": "updates",
+      "evidence": "temporary openTerminal status changes"
+    },
+    {
+      "source": "component:character",
+      "target": "domain:sprites",
+      "type": "depends-on",
+      "evidence": "imports constants, timing, phrase pools, and sounds"
+    },
+    {
+      "source": "component:character",
+      "target": "store:app-store",
+      "type": "reads-and-writes",
+      "evidence": "useAppStore and setBounds"
+    },
+    {
+      "source": "component:character",
+      "target": "ipc:set-ignore-cursor-events",
+      "type": "invokes",
+      "evidence": "hover hitbox toggles click-through"
+    },
+    {
+      "source": "styles:global",
+      "target": "window:overlay",
+      "type": "styles",
+      "evidence": "transparent html/body/root"
+    },
+    {
+      "source": "backend:main",
+      "target": "backend:lib",
+      "type": "delegates-to",
+      "evidence": "dockduo_lib::run()"
+    },
+    {
+      "source": "backend:lib",
+      "target": "backend:overlay",
+      "type": "initializes",
+      "evidence": "configure_overlay_window(app)"
+    },
+    {
+      "source": "backend:lib",
+      "target": "backend:taskbar",
+      "type": "starts",
+      "evidence": "start_polling(app.handle())"
+    },
+    {
+      "source": "backend:lib",
+      "target": "ipc:get-taskbar-info",
+      "type": "registers",
+      "evidence": "tauri command handler"
+    },
+    {
+      "source": "backend:lib",
+      "target": "ipc:set-ignore-cursor-events",
+      "type": "registers",
+      "evidence": "tauri command handler"
+    },
+    {
+      "source": "ipc:get-taskbar-info",
+      "target": "backend:taskbar",
+      "type": "reads-from",
+      "evidence": "taskbar::current()"
+    },
+    {
+      "source": "ipc:set-ignore-cursor-events",
+      "target": "config:tauri",
+      "type": "acts-on-window",
+      "evidence": "overlay window label"
+    },
+    {
+      "source": "backend:taskbar",
+      "target": "event:taskbar-changed",
+      "type": "emits",
+      "evidence": "app.emit(\"taskbar-changed\", info.clone())"
+    },
+    {
+      "source": "backend:taskbar",
+      "target": "backend:overlay",
+      "type": "repositions-via",
+      "evidence": "position_above_taskbar() on change"
+    },
+    {
+      "source": "script:convert-sprites",
+      "target": "asset:source-frames",
+      "type": "consumes",
+      "evidence": "MConverter frame directories"
+    },
+    {
+      "source": "script:convert-sprites",
+      "target": "upstream:lil-agents",
+      "type": "imports-from",
+      "evidence": "sound and icon copy paths"
+    },
+    {
+      "source": "script:convert-sprites",
+      "target": "asset:runtime-public",
+      "type": "produces",
+      "evidence": "public/sprites, public/sounds, public/icons"
+    },
+    {
+      "source": "domain:sprites",
+      "target": "asset:runtime-public",
+      "type": "references",
+      "evidence": "sprite sheet and sound URLs"
+    },
+    {
+      "source": "doc:build-plan",
+      "target": "planned:terminal-window",
+      "type": "specifies",
+      "evidence": "Phase 3 and section 9.3"
+    },
+    {
+      "source": "doc:build-plan",
+      "target": "planned:pty-manager",
+      "type": "specifies",
+      "evidence": "Phase 3 and terminal.rs contract"
+    },
+    {
+      "source": "doc:build-plan",
+      "target": "planned:providers",
+      "type": "specifies",
+      "evidence": "providers.rs and onboarding flow"
+    },
+    {
+      "source": "doc:build-plan",
+      "target": "planned:tray-config",
+      "type": "specifies",
+      "evidence": "Phase 4 tray and config modules"
+    },
+    {
+      "source": "doc:build-plan",
+      "target": "planned:onboarding",
+      "type": "specifies",
+      "evidence": "Phase 4 onboarding modal"
+    },
+    {
+      "source": "planned:terminal-window",
+      "target": "planned:pty-manager",
+      "type": "depends-on",
+      "evidence": "terminal UI requires backend PTY sessions"
+    },
+    {
+      "source": "planned:onboarding",
+      "target": "planned:providers",
+      "type": "depends-on",
+      "evidence": "CLI detection UI depends on provider registry"
+    }
+  ],
+  "insights": {
+    "entrypoints": [
+      "src/main.tsx",
+      "src-tauri/src/main.rs",
+      "src-tauri/src/lib.rs"
+    ],
+    "current_runtime_loop": [
+      "Tauri launches overlay window",
+      "Rust configures transparent click-through behavior",
+      "Frontend queries taskbar info and renders two Character instances",
+      "Character updates bounds into appStore and asks Rust to toggle cursor pass-through on hover",
+      "Rust polls taskbar changes and emits taskbar-changed to keep the overlay aligned"
+    ],
+    "highest-centrality_nodes": [
+      "window:overlay",
+      "component:character",
+      "backend:lib",
+      "backend:taskbar",
+      "doc:build-plan"
+    ],
+    "gaps_against_plan": [
+      "No terminal windows or xterm.js integration yet",
+      "No PTY backend or provider detection yet",
+      "No tray, config persistence, fullscreen handling, or onboarding yet",
+      "Current store is a minimal custom store rather than the richer Zustand spec from the plan"
+    ]
+  }
+}

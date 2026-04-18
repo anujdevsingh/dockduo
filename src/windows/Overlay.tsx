@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import Character from "../components/Character";
+import { appStore } from "../store/appStore";
 
 type TaskbarEdge = "bottom" | "top" | "left" | "right";
 
@@ -21,7 +23,6 @@ export default function Overlay() {
       .catch((e) => console.error("get_taskbar_info failed", e));
 
     const unlistenPromise = listen<TaskbarInfo>("taskbar-changed", (event) => {
-      console.log("taskbar-changed", event.payload);
       setTb(event.payload);
     });
 
@@ -30,45 +31,59 @@ export default function Overlay() {
     };
   }, []);
 
-  // Phase 1 smoke test: render a colored stripe along the full overlay.
-  // The overlay is transparent except for this stripe, proving the
-  // window is positioned correctly above the taskbar.
+  // Overlay occupies the full overlay window; the characters walk along
+  // its bottom edge. We compute their track in CSS pixels.
+  const W = typeof window !== "undefined" ? window.innerWidth : 1920;
+  const H = typeof window !== "undefined" ? window.innerHeight : 200;
+
+  const openTerminal = (character: "bruce" | "jazz") => {
+    console.log(`open terminal for ${character} (wired in Phase 3)`);
+    // Temporary feedback until Phase 3: flash busy -> completed
+    appStore.setAiStatus(character, "busy");
+    setTimeout(() => appStore.setAiStatus(character, "completed"), 1500);
+    setTimeout(() => appStore.setAiStatus(character, "idle"), 5000);
+  };
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        pointerEvents: "none",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          height: "12px",
-          background: "linear-gradient(90deg,#E8845A,#58A6FF,#4CAF50)",
-          opacity: 0.85,
-        }}
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none" }}>
+      <Character
+        character="bruce"
+        initialFraction={0.2}
+        trackLeft={0}
+        trackRight={W}
+        trackBottom={H}
+        onClick={() => openTerminal("bruce")}
       />
-      <div
-        style={{
-          position: "absolute",
-          top: 8,
-          left: 12,
-          fontSize: 12,
-          color: "rgba(255,255,255,0.85)",
-          background: "rgba(0,0,0,0.55)",
-          padding: "4px 8px",
-          borderRadius: 4,
-          fontFamily: "monospace",
-        }}
-      >
-        {tb
-          ? `DockDuo · edge=${tb.edge} · dpi=${tb.dpi_scale.toFixed(2)} · auto_hide=${tb.auto_hide}`
-          : "DockDuo · loading taskbar info…"}
-      </div>
+      <Character
+        character="jazz"
+        initialFraction={0.75}
+        trackLeft={0}
+        trackRight={W}
+        trackBottom={H}
+        onClick={() => openTerminal("jazz")}
+      />
+
+      {/* Debug badge removed — enable via VITE_DEBUG=1 if needed */}
+      {import.meta.env.VITE_DEBUG === "1" && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 12,
+            fontSize: 11,
+            color: "rgba(255,255,255,0.75)",
+            background: "rgba(0,0,0,0.45)",
+            padding: "3px 8px",
+            borderRadius: 4,
+            fontFamily: "monospace",
+            pointerEvents: "none",
+          }}
+        >
+          {tb
+            ? `DockDuo · edge=${tb.edge} · dpi=${tb.dpi_scale.toFixed(2)} · auto_hide=${tb.auto_hide}`
+            : "DockDuo · loading…"}
+        </div>
+      )}
     </div>
   );
 }
