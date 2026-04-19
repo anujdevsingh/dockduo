@@ -30,6 +30,18 @@
         "shadow": false,
         "acceptFirstMouse": true,
         "visible": true
+      },
+      {
+        "label": "onboarding",
+        "url": "index.html",
+        "title": "Welcome to DockDuo",
+        "width": 560,
+        "height": 540,
+        "center": true,
+        "resizable": false,
+        "decorations": true,
+        "visible": false,
+        "skipTaskbar": false
       }
     ],
     "security": { "csp": null }

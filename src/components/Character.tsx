@@ -19,7 +19,7 @@ import {
   randomPhrase,
   type CharacterId,
 } from "../lib/sprites";
-import { appStore, useAppStore } from "../store/appStore";
+import { appStore, useAppStore, type AgentInfo } from "../store/appStore";
 
 interface Props {
   character: CharacterId;
@@ -28,6 +28,7 @@ interface Props {
   trackRight: number;
   trackBottom: number;
   onClick: () => void;
+  onPickAgent?: (agent: AgentInfo) => void;
 }
 
 type Phase = "pausing" | "walking";
@@ -37,7 +38,7 @@ function randBetween(a: number, b: number) {
 }
 
 export default function Character(props: Props) {
-  const { character, initialFraction, trackLeft, trackRight, trackBottom, onClick } = props;
+  const { character, initialFraction, trackLeft, trackRight, trackBottom, onClick, onPickAgent } = props;
   const cfg = CHARACTERS[character];
 
   const spriteRef = useRef<HTMLDivElement>(null);
@@ -50,8 +51,21 @@ export default function Character(props: Props) {
     aiStatusRef.current = aiStatus;
   }, [aiStatus]);
 
+  const error = useAppStore((s) => s.errors[character]);
+  const errorRef = useRef(error);
+  useEffect(() => {
+    errorRef.current = error;
+  }, [error]);
+
+  const picker = useAppStore((s) => s.pickers[character]);
+  const pickerRef = useRef(picker);
+  useEffect(() => {
+    pickerRef.current = picker;
+  }, [picker]);
+
   const [bubbleText, setBubbleText] = useState<string>("");
   const [bubbleIsCompletion, setBubbleIsCompletion] = useState(false);
+  const [bubbleIsError, setBubbleIsError] = useState(false);
 
   useEffect(() => {
     const sprite = spriteRef.current;
@@ -134,33 +148,67 @@ export default function Character(props: Props) {
       const left = cx - halfW;
       const top = trackBottom - DISPLAY_HEIGHT;
       container.style.transform = `translate(${left}px, ${top}px)`;
-      if (hitboxRef.current) {
-        hitboxRef.current.style.transform = `translate(${left}px, ${top}px)`;
-      }
 
       const want = goingRight ? "" : "scaleX(-1)";
       if (sprite.style.transform !== want) sprite.style.transform = want;
 
+      // Keep the hitbox div sprite-sized so clicking a pill doesn't
+      // accidentally hit this transparent layer (which sits above the
+      // container) and dismiss the picker.
+      if (hitboxRef.current) {
+        hitboxRef.current.style.transform = `translate(${left}px, ${top}px)`;
+      }
+
+      // Reported bounds DO extend upward when the picker is showing, so
+      // the Rust cursor-poll takes the overlay out of click-through mode
+      // over the pill area. The picker div itself has pointer-events: auto
+      // on its buttons, so clicks land directly on them.
+      const pickerActive =
+        pickerRef.current !== null &&
+        Date.now() < (pickerRef.current?.expiresAt ?? 0);
+      const boundsTop = pickerActive ? top - 64 : top;
+      const boundsHeight = pickerActive ? DISPLAY_HEIGHT + 64 : DISPLAY_HEIGHT;
       const bounds = {
-        x: left,
-        y: top,
-        w: DISPLAY_WIDTH,
-        h: DISPLAY_HEIGHT,
+        x: left - 40,
+        y: boundsTop,
+        w: DISPLAY_WIDTH + 80,
+        h: boundsHeight,
       };
       appStore.setBounds(character, bounds);
       // Rust cursor-polling uses these bounds to decide when to flip the
       // overlay window out of click-through mode.
       invoke("report_bounds", { character, bounds }).catch(() => {});
 
-      // Bubble state machine
+      // Bubble state machine — errors trump everything else.
+      const currentErr = errorRef.current;
       const currentAi = aiStatusRef.current;
-      if (currentAi === "completed" && lastAiStatus !== "completed") {
+      const nowMs = Date.now();
+
+      if (currentErr && nowMs < currentErr.expiresAt) {
+        // Red error bubble. Overrides thinking/completion.
+        setBubbleText(currentErr.text);
+        setBubbleIsCompletion(false);
+        setBubbleIsError(true);
+      } else if (currentErr && nowMs >= currentErr.expiresAt) {
+        // Expired — ask the store to clear so React re-renders cleanly.
+        appStore.clearError(character);
+        setBubbleIsError(false);
+        setBubbleText("");
+        currentPhrase = "";
+      } else if (
+        pickerRef.current !== null &&
+        nowMs >= pickerRef.current.expiresAt
+      ) {
+        // Picker auto-dismiss.
+        appStore.clearPicker(character);
+      } else if (currentAi === "completed" && lastAiStatus !== "completed") {
         const phrase = randomPhrase(COMPLETION_PHRASES);
         currentPhrase = phrase;
         showingCompletion = true;
         completionExpiry = now + 3.0;
         setBubbleText(phrase);
         setBubbleIsCompletion(true);
+        setBubbleIsError(false);
         playCompletionSound();
       } else if (showingCompletion) {
         if (now >= completionExpiry) {
@@ -174,6 +222,7 @@ export default function Character(props: Props) {
           nextPhraseChange = randBetween(3.0, 5.0);
           setBubbleText(currentPhrase);
           setBubbleIsCompletion(false);
+          setBubbleIsError(false);
         }
       } else if (bubbleText !== "" && currentAi === "idle" && !showingCompletion) {
         currentPhrase = "";
@@ -217,7 +266,55 @@ export default function Character(props: Props) {
             imageRendering: "auto",
           }}
         />
-        {bubbleText && (
+        {picker && !error && (
+          <div
+            style={{
+              position: "absolute",
+              top: -54,
+              left: "50%",
+              transform: "translateX(-50%)",
+              display: "flex",
+              gap: 8,
+              pointerEvents: "auto",
+              zIndex: 10,
+            }}
+          >
+            {picker.agents.map((a) => (
+              <button
+                key={a.kind}
+                onMouseDown={(e) => {
+                  // Fire on mousedown so the hitbox sibling (which also
+                  // listens to click) can't steal the interaction.
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onPickAgent?.(a);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                style={{
+                  padding: "6px 14px",
+                  background: "var(--picker-bg, #111418)",
+                  color: "var(--picker-text, #FFFFFF)",
+                  border: "1px solid var(--picker-border, rgba(255,255,255,0.55))",
+                  borderRadius: 999,
+                  fontFamily: "-apple-system, system-ui, sans-serif",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  letterSpacing: 0.3,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  boxShadow: "var(--shadow, 0 4px 14px rgba(0,0,0,0.55))",
+                  textShadow: "0 1px 0 rgba(0,0,0,0.3)",
+                  opacity: 1,
+                }}
+              >
+                {a.displayName}
+              </button>
+            ))}
+          </div>
+        )}
+        {bubbleText && !picker && (
           <div
             style={{
               position: "absolute",
@@ -225,16 +322,29 @@ export default function Character(props: Props) {
               left: "50%",
               transform: "translateX(-50%)",
               padding: "4px 12px",
-              background: "rgba(24,24,28,0.92)",
-              color: bubbleIsCompletion ? "#7CFFB2" : "#FFFFFF",
-              border: `1px solid ${bubbleIsCompletion ? "#3AA76A" : "rgba(255,255,255,0.25)"}`,
+              background: bubbleIsError
+                ? "var(--bubble-error-bg, rgba(60,10,10,0.95))"
+                : "var(--bubble-bg, rgba(24,24,28,0.92))",
+              color: bubbleIsError
+                ? "var(--bubble-error-text, #FFB3B3)"
+                : bubbleIsCompletion
+                  ? "var(--bubble-completion-text, #7CFFB2)"
+                  : "var(--bubble-text, #FFFFFF)",
+              border: `1px solid ${
+                bubbleIsError
+                  ? "var(--bubble-error-border, #D9534F)"
+                  : bubbleIsCompletion
+                    ? "var(--bubble-completion-border, #3AA76A)"
+                    : "var(--bubble-border, rgba(255,255,255,0.25))"
+              }`,
+              maxWidth: 260,
+              whiteSpace: bubbleIsError ? "normal" : "nowrap",
               borderRadius: 12,
               fontFamily: "-apple-system, system-ui, sans-serif",
               fontSize: 12,
               fontWeight: 500,
-              whiteSpace: "nowrap",
               pointerEvents: "none",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+              boxShadow: "var(--shadow, 0 2px 8px rgba(0,0,0,0.4))",
             }}
           >
             {bubbleText}
