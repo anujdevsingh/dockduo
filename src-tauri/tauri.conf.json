@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "overlay",
-        "url": "index.html?window=overlay",
+        "url": "index.html",
         "title": "DockDuo",
         "width": 1920,
         "height": 200,

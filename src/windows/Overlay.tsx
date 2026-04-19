@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import Character from "../components/Character";
 import { appStore } from "../store/appStore";
+import type { AiStatus, CharacterId } from "../lib/sprites";
 
 type TaskbarEdge = "bottom" | "top" | "left" | "right";
 
@@ -22,12 +23,21 @@ export default function Overlay() {
       .then(setTb)
       .catch((e) => console.error("get_taskbar_info failed", e));
 
-    const unlistenPromise = listen<TaskbarInfo>("taskbar-changed", (event) => {
+    const unlistenTb = listen<TaskbarInfo>("taskbar-changed", (event) => {
       setTb(event.payload);
     });
 
+    // Real AI status events from the Rust side (claude process lifecycle).
+    const unlistenAi = listen<{ character: CharacterId; status: AiStatus }>(
+      "ai-status-changed",
+      (event) => {
+        appStore.setAiStatus(event.payload.character, event.payload.status);
+      },
+    );
+
     return () => {
-      unlistenPromise.then((un) => un());
+      unlistenTb.then((un) => un());
+      unlistenAi.then((un) => un());
     };
   }, []);
 
@@ -36,12 +46,15 @@ export default function Overlay() {
   const W = typeof window !== "undefined" ? window.innerWidth : 1920;
   const H = typeof window !== "undefined" ? window.innerHeight : 200;
 
-  const openTerminal = (character: "bruce" | "jazz") => {
-    console.log(`open terminal for ${character} (wired in Phase 3)`);
-    // Temporary feedback until Phase 3: flash busy -> completed
-    appStore.setAiStatus(character, "busy");
-    setTimeout(() => appStore.setAiStatus(character, "completed"), 1500);
-    setTimeout(() => appStore.setAiStatus(character, "idle"), 5000);
+  const openTerminal = async (character: CharacterId) => {
+    try {
+      await invoke<number>("spawn_claude", { character });
+      // Rust emits the "busy" status itself on successful spawn.
+    } catch (err) {
+      // If claude is already running for this character, that's fine.
+      // Any other error gets logged so we can see it during dev.
+      console.warn(`spawn_claude(${character}) failed:`, err);
+    }
   };
 
   return (

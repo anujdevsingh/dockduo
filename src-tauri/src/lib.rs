@@ -1,5 +1,7 @@
 //! DockDuo — library entry. `main.rs` simply calls `run()`.
 
+pub mod claude;
+pub mod hit_test;
 pub mod overlay;
 pub mod taskbar;
 
@@ -28,11 +30,14 @@ pub fn run() {
         .setup(|app| {
             overlay::configure_overlay_window(app)?;
             taskbar::start_polling(app.handle().clone());
+            hit_test::start_polling(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_taskbar_info,
-            set_ignore_cursor_events
+            set_ignore_cursor_events,
+            claude::spawn_claude,
+            hit_test::report_bounds
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

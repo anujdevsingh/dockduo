@@ -141,12 +141,16 @@ export default function Character(props: Props) {
       const want = goingRight ? "" : "scaleX(-1)";
       if (sprite.style.transform !== want) sprite.style.transform = want;
 
-      appStore.setBounds(character, {
+      const bounds = {
         x: left,
         y: top,
         w: DISPLAY_WIDTH,
         h: DISPLAY_HEIGHT,
-      });
+      };
+      appStore.setBounds(character, bounds);
+      // Rust cursor-polling uses these bounds to decide when to flip the
+      // overlay window out of click-through mode.
+      invoke("report_bounds", { character, bounds }).catch(() => {});
 
       // Bubble state machine
       const currentAi = aiStatusRef.current;
@@ -184,10 +188,6 @@ export default function Character(props: Props) {
     return () => cancelAnimationFrame(rafId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [character, trackLeft, trackRight, trackBottom, initialFraction]);
-
-  const setIgnoreCursor = (ignore: boolean) => {
-    invoke("set_ignore_cursor_events", { windowLabel: "overlay", ignore }).catch(() => {});
-  };
 
   const sheetW = SHEET_COLS * DISPLAY_WIDTH;
   const sheetH = SHEET_ROWS * DISPLAY_HEIGHT;
@@ -243,8 +243,6 @@ export default function Character(props: Props) {
       </div>
       <div
         ref={hitboxRef}
-        onMouseEnter={() => setIgnoreCursor(false)}
-        onMouseLeave={() => setIgnoreCursor(true)}
         onClick={onClick}
         style={{
           position: "absolute",
