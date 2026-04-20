@@ -48,3 +48,7 @@ _MConverter.eu_walk-jazz-01/
 
 # Build outputs that should never be committed
 src-tauri/target/release/bundle/
+
+# graphify knowledge-graph artifacts (regenerable via /graphify .)
+graphify-out/
+.graphify_*

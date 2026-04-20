@@ -1,0 +1,14 @@
+# graphify scope: DockDuo project only (not upstream macOS or sprite sources)
+_MConverter.eu_walk-bruce-01/
+_MConverter.eu_walk-jazz-01/
+lil-agents-main/
+public/
+graphify-out/
+docs/project-graph/
+src-tauri/target/
+src-tauri/gen/
+node_modules/
+dist/
+.git/
+src-tauri/icons/
+src/assets/
