@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the overlay window",
+  "description": "Capability for the overlay + onboarding windows",
   "windows": ["overlay", "onboarding"],
   "permissions": [
     "core:default",
@@ -12,6 +12,9 @@
     "core:window:allow-show",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
-    "global-shortcut:allow-is-registered"
+    "global-shortcut:allow-is-registered",
+    "autostart:default",
+    "updater:default",
+    "log:default"
   ]
 }

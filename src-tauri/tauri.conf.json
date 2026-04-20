@@ -44,7 +44,18 @@
         "skipTaskbar": false
       }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: https://asset.localhost http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://github.com/anujdevsingh/dockduo/releases/latest/download/latest.json"
+      ],
+      "pubkey": "TO_BE_GENERATED_IN_PHASE_5"
+    }
   },
   "bundle": {
     "active": true,

@@ -1,5 +1,6 @@
 //! DockDuo — library entry. `main.rs` simply calls `run()`.
 
+pub mod autostart;
 pub mod claude;
 pub mod config;
 pub mod fullscreen;
@@ -8,6 +9,7 @@ pub mod hotkey;
 pub mod overlay;
 pub mod taskbar;
 pub mod tray;
+pub mod updater;
 
 use tauri::{Manager, Runtime};
 
@@ -35,7 +37,49 @@ fn toggle_overlay_visibility<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(),
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Resolve the per-user log directory once so the log plugin can
+    // pin output to %APPDATA%\DockDuo\logs\DockDuo.log. Falls back to the
+    // OS temp dir if we somehow can't resolve %APPDATA%.
+    let log_dir = dirs::config_dir()
+        .map(|d| d.join("DockDuo").join("logs"))
+        .unwrap_or_else(std::env::temp_dir);
+    let _ = std::fs::create_dir_all(&log_dir);
+
     tauri::Builder::default()
+        // Single-instance must be registered first so a double-launch is
+        // caught before any windows are created. We reveal the overlay
+        // (and focus the onboarding window if it's up) on duplicate launches.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(win) = app.get_webview_window("overlay") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+            if let Some(win) = app.get_webview_window("onboarding") {
+                let _ = win.set_focus();
+            }
+        }))
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .clear_targets()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Folder {
+                        path: log_dir,
+                        file_name: Some("DockDuo".into()),
+                    },
+                ))
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                ))
+                .build(),
+        )
+        // Autostart plugin. We pass no extra args — the entry launches
+        // DockDuo identically to a manual run, which then shows only the
+        // overlay (onboarding is skipped since the user already completed it).
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             overlay::configure_overlay_window(app)?;
@@ -69,12 +113,16 @@ pub fn run() {
             toggle_overlay_visibility,
             claude::list_agents,
             claude::spawn_agent,
+            claude::check_cli_available,
             hit_test::report_bounds,
             config::get_config,
             config::set_theme,
             config::mark_onboarded,
             config::set_last_agent,
-            fullscreen::set_hide_on_fullscreen
+            fullscreen::set_hide_on_fullscreen,
+            autostart::get_autostart,
+            autostart::set_autostart,
+            updater::check_for_updates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

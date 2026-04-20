@@ -3,7 +3,10 @@
 //! Phase 4 tray menu:
 //!   • Show / Hide DockDuo  (toggles overlay; also on tray left-click)
 //!   • Theme  ▸  Midnight · Daylight · Pastel · Retro   (live switch)
+//!   • Start with Windows  (checkbox, backed by autostart plugin)
 //!   • Hide on fullscreen  (checkbox, persisted)
+//!   • Check for updates
+//!   • About
 //!   • Quit
 //!
 //! Theme and hide-on-fullscreen picks are persisted via `config.rs` and
@@ -18,7 +21,7 @@ use tauri::{
     App, AppHandle, Emitter, Manager, Runtime,
 };
 
-use crate::config::{self, Theme};
+use crate::{autostart, config::{self, Theme}, updater};
 
 const MENU_ID_TOGGLE: &str = "toggle_overlay";
 const MENU_ID_QUIT: &str = "quit";
@@ -27,6 +30,11 @@ const MENU_ID_THEME_DAYLIGHT: &str = "theme_daylight";
 const MENU_ID_THEME_PASTEL: &str = "theme_pastel";
 const MENU_ID_THEME_RETRO: &str = "theme_retro";
 const MENU_ID_HIDE_FS: &str = "hide_on_fullscreen";
+const MENU_ID_AUTOSTART: &str = "start_with_windows";
+const MENU_ID_CHECK_UPDATES: &str = "check_updates";
+const MENU_ID_ABOUT: &str = "about";
+
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Build and register the tray icon. Call once from `setup()`.
 pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
@@ -67,6 +75,16 @@ pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
         &[&t_midnight, &t_daylight, &t_pastel, &t_retro],
     )?;
 
+    let autostart_on = autostart::is_enabled(handle);
+    let autostart_item = CheckMenuItem::with_id(
+        handle,
+        MENU_ID_AUTOSTART,
+        "Start with Windows",
+        true,
+        autostart_on,
+        None::<&str>,
+    )?;
+
     let hide_fs = CheckMenuItem::with_id(
         handle,
         MENU_ID_HIDE_FS,
@@ -76,13 +94,41 @@ pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
         None::<&str>,
     )?;
 
+    let check_updates = MenuItem::with_id(
+        handle,
+        MENU_ID_CHECK_UPDATES,
+        "Check for updates…",
+        true,
+        None::<&str>,
+    )?;
+
+    let about = MenuItem::with_id(
+        handle,
+        MENU_ID_ABOUT,
+        format!("About DockDuo {}", APP_VERSION),
+        true,
+        None::<&str>,
+    )?;
+
     let sep1 = PredefinedMenuItem::separator(handle)?;
     let sep2 = PredefinedMenuItem::separator(handle)?;
+    let sep3 = PredefinedMenuItem::separator(handle)?;
     let quit = MenuItem::with_id(handle, MENU_ID_QUIT, "Quit", true, None::<&str>)?;
 
     let menu = Menu::with_items(
         handle,
-        &[&toggle, &sep1, &theme_sub, &hide_fs, &sep2, &quit],
+        &[
+            &toggle,
+            &sep1,
+            &theme_sub,
+            &autostart_item,
+            &hide_fs,
+            &sep2,
+            &check_updates,
+            &about,
+            &sep3,
+            &quit,
+        ],
     )?;
 
     // Keep refs so on_menu_event can toggle checks without re-building.
@@ -91,6 +137,7 @@ pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
     let t_pastel_c = t_pastel.clone();
     let t_retro_c = t_retro.clone();
     let hide_fs_c = hide_fs.clone();
+    let autostart_c = autostart_item.clone();
 
     let icon = load_tray_icon();
 
@@ -133,6 +180,46 @@ pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
                         let _ = win.show();
                     }
                 }
+            }
+            MENU_ID_AUTOSTART => {
+                // `is_checked` reflects the post-click state.
+                let want = autostart_c.is_checked().unwrap_or(false);
+                match autostart::set_autostart(app.clone(), want) {
+                    Ok(actual) => {
+                        // If the plugin disagreed (e.g. registry write
+                        // denied), re-sync the checkbox to reality.
+                        if actual != want {
+                            let _ = autostart_c.set_checked(actual);
+                        }
+                        tracing::info!(enabled = actual, "autostart updated");
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "autostart toggle failed");
+                        // Revert the checkbox — the write didn't land.
+                        let _ = autostart_c.set_checked(!want);
+                    }
+                }
+            }
+            MENU_ID_CHECK_UPDATES => {
+                let app_handle = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let result = updater::check_for_updates(app_handle.clone()).await;
+                    tracing::info!(
+                        status = %result.status,
+                        message = %result.message,
+                        "update check finished"
+                    );
+                    let _ = app_handle.emit("update-check-result", &result);
+                });
+            }
+            MENU_ID_ABOUT => {
+                let _ = app.emit(
+                    "about-opened",
+                    serde_json::json!({
+                        "version": APP_VERSION,
+                        "product": "DockDuo",
+                    }),
+                );
             }
             other => tracing::debug!(id = %other, "unhandled tray menu id"),
         })

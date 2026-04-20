@@ -151,14 +151,57 @@ pub fn list_agents() -> Vec<AgentInfo> {
     out
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct CliAvailability {
+    pub available: bool,
+    pub path: Option<String>,
+    #[serde(rename = "installHint")]
+    pub install_hint: String,
+}
+
+/// Per-provider availability check. Thin wrapper around `detect_binary`
+/// so the frontend can poll a single provider without enumerating all
+/// three every time (useful for onboarding re-checks after the user
+/// installs something).
+#[tauri::command]
+pub fn check_cli_available(provider: String) -> CliAvailability {
+    let (kind, hint) = match provider.as_str() {
+        "claude" => (Some(AgentKind::Claude), "npm install -g @anthropic-ai/claude-code"),
+        "codex" => (Some(AgentKind::Codex), "npm install -g @openai/codex"),
+        "gemini" => (Some(AgentKind::Gemini), "npm install -g @google/generative-ai-cli"),
+        _ => (None, ""),
+    };
+    match kind {
+        Some(k) => {
+            let path = detect_binary(k.binary());
+            CliAvailability {
+                available: path.is_some(),
+                path,
+                install_hint: hint.to_string(),
+            }
+        }
+        None => CliAvailability {
+            available: false,
+            path: None,
+            install_hint: format!("Unknown provider '{provider}'."),
+        },
+    }
+}
+
 /// Spawn the chosen agent in a new console for the given character.
 /// De-dupes per character slot — a second click while the terminal is
 /// already open is rejected with an "already running" error.
+///
+/// SECURITY: The frontend passes only a fixed `AgentKind` enum. The
+/// actual executable path is resolved server-side via `detect_binary`
+/// so the webview cannot request an arbitrary binary. As defence in
+/// depth the resolved path is also checked for shell metacharacters
+/// before being handed to `cmd.exe /K`.
 #[tauri::command]
 pub fn spawn_agent<R: Runtime>(
     app: AppHandle<R>,
     character: String,
-    #[allow(non_snake_case)] agentPath: String,
+    kind: AgentKind,
 ) -> Result<u32, String> {
     {
         let active = ACTIVE.lock().unwrap();
@@ -167,12 +210,30 @@ pub fn spawn_agent<R: Runtime>(
         }
     }
 
-    if agentPath.trim().is_empty() {
-        return Err("empty agent path".into());
+    let agent_path = detect_binary(kind.binary())
+        .ok_or_else(|| format!("'{}' not installed on this machine", kind.binary()))?;
+
+    // Defence in depth: `cmd.exe /K` parses its payload as a shell
+    // command line, so any of these characters in the resolved path
+    // would be interpreted. `detect_binary` only returns paths we
+    // produced ourselves or `where.exe` found on PATH, but we still
+    // reject suspicious strings rather than trust them blindly.
+    if agent_path
+        .chars()
+        .any(|c| matches!(c, '&' | '|' | '<' | '>' | '^' | '"' | '\n' | '\r'))
+    {
+        return Err(format!(
+            "resolved path for '{}' contains unsafe characters; aborting",
+            kind.binary()
+        ));
     }
 
+    // Quote the path so spaces (e.g. `C:\Program Files\...`) survive
+    // cmd.exe's parsing. Inner `"` is already rejected above.
+    let quoted = format!("\"{agent_path}\"");
+
     let mut cmd = Command::new("cmd.exe");
-    cmd.args(["/K", &agentPath]);
+    cmd.args(["/K", &quoted]);
 
     // CREATE_NEW_CONSOLE attaches a brand-new console window. Do NOT
     // redirect stdio to NUL — that would make `/K` see EOF immediately
@@ -182,7 +243,7 @@ pub fn spawn_agent<R: Runtime>(
 
     let child = cmd
         .spawn()
-        .with_context(|| format!("failed to spawn '{agentPath}'"))
+        .with_context(|| format!("failed to spawn '{agent_path}'"))
         .map_err(|e| e.to_string())?;
 
     let pid = child.id();

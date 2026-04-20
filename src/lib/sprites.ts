@@ -69,11 +69,21 @@ export const THINKING_PHRASES = [
   "on it!", "gimme a sec", "brb", "processing...",
   "hang tight", "just a moment", "figuring it out",
   "crunching...", "reading...", "looking...",
+  "consulting the oracle...", "running the numbers...",
+  "checking my notes...", "doing the math", "reasoning...",
+  "stirring the pot", "cooking...", "thinking very hard",
+  "let me think...", "noodle-ing on this", "plotting...",
+  "wiring it up", "untangling...", "tracing it back",
+  "chewing on this", "in the zone", "deep breath",
+  "scribbling...", "sketching...", "pondering",
+  "weighing options", "double-checking", "triangulating",
+  "lemme see", "one moment", "putting it together",
 ];
 
 export const COMPLETION_PHRASES = [
   "done!", "all set!", "ready!", "here you go", "got it!",
   "finished!", "ta-da!", "voila!", "boom!", "there ya go!",
+  "nailed it", "sorted", "that's the one", "ship it",
 ];
 
 export function randomPhrase(list: string[], exclude?: string): string {

@@ -68,7 +68,7 @@ export default function Overlay() {
     try {
       await invoke<number>("spawn_agent", {
         character,
-        agentPath: agent.path,
+        kind: agent.kind,
       });
     } catch (err) {
       const msg = typeof err === "string" ? err : String(err);
