@@ -228,12 +228,25 @@ pub fn spawn_agent<R: Runtime>(
         ));
     }
 
-    // Quote the path so spaces (e.g. `C:\Program Files\...`) survive
-    // cmd.exe's parsing. Inner `"` is already rejected above.
-    let quoted = format!("\"{agent_path}\"");
-
     let mut cmd = Command::new("cmd.exe");
-    cmd.args(["/K", &quoted]);
+
+    // Rust's default Windows argument encoder wraps any arg containing
+    // `"` in another layer of quotes and escapes the inner ones, which
+    // turns `cmd /K "C:\path\x.exe"` into `cmd /K "\"C:\path\x.exe\""`
+    // on the actual command line. cmd.exe then strips its outer pair
+    // and tries to execute a program literally named
+    // `"C:\path\x.exe"` (with quotes) — which fails with
+    // "is not recognized as an internal or external command". The
+    // `CommandExt::raw_arg` path appends the argument verbatim,
+    // letting cmd.exe /K see exactly one pair of quotes around the
+    // resolved path, which is what its quirky quoting rules expect.
+    #[cfg(windows)]
+    {
+        cmd.raw_arg("/K");
+        cmd.raw_arg(format!("\"{agent_path}\""));
+    }
+    #[cfg(not(windows))]
+    cmd.args(["/K", &agent_path]);
 
     // CREATE_NEW_CONSOLE attaches a brand-new console window. Do NOT
     // redirect stdio to NUL — that would make `/K` see EOF immediately
