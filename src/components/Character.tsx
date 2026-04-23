@@ -23,10 +23,14 @@ import { appStore, useAppStore, type AgentInfo } from "../store/appStore";
 
 interface Props {
   character: CharacterId;
+  /** Tauri webview label (`overlay`, `overlay_1`, …) for multi-monitor hit testing. */
+  windowLabel: string;
   initialFraction: number;
   trackLeft: number;
   trackRight: number;
   trackBottom: number;
+  /** When true, freeze the walk animation — used while the chat bubble is open. */
+  paused?: boolean;
   onClick: () => void;
   onPickAgent?: (agent: AgentInfo) => void;
 }
@@ -38,8 +42,23 @@ function randBetween(a: number, b: number) {
 }
 
 export default function Character(props: Props) {
-  const { character, initialFraction, trackLeft, trackRight, trackBottom, onClick, onPickAgent } = props;
+  const {
+    character,
+    windowLabel,
+    initialFraction,
+    trackLeft,
+    trackRight,
+    trackBottom,
+    paused,
+    onClick,
+    onPickAgent,
+  } = props;
   const cfg = CHARACTERS[character];
+
+  const pausedRef = useRef(paused ?? false);
+  useEffect(() => {
+    pausedRef.current = paused ?? false;
+  }, [paused]);
 
   const spriteRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,8 +139,18 @@ export default function Character(props: Props) {
     let rafId = 0;
     const loop = () => {
       const now = performance.now() / 1000;
+      const isPaused = pausedRef.current;
 
-      if (phase === "pausing") {
+      if (isPaused) {
+        // Freeze the sprite in-place while the chat bubble is open.
+        // Whenever the bubble closes, resume from a fresh pause so the
+        // character doesn't snap into the middle of a walk.
+        if (phase === "walking") {
+          enterPause(now);
+        } else {
+          pauseEnd = now + 0.2;
+        }
+      } else if (phase === "pausing") {
         if (now >= pauseEnd) startWalk(now);
       } else {
         const elapsed = now - walkStartTime;
@@ -133,10 +162,8 @@ export default function Character(props: Props) {
         if (elapsed >= WALK_TIMING.videoDuration) enterPause(now);
       }
 
-      // Sprite frame — pausing shows frame 0, walking cycles through the walk window
-      // (the video's walk cycle runs between accelStart and walkStop seconds)
       let frameIdx = 0;
-      if (phase === "walking") {
+      if (phase === "walking" && !isPaused) {
         const walkElapsed = now - spriteStartTime;
         frameIdx = Math.floor(walkElapsed * SHEET_FPS) % SHEET_FRAMES;
       }
@@ -177,7 +204,11 @@ export default function Character(props: Props) {
       appStore.setBounds(character, bounds);
       // Rust cursor-polling uses these bounds to decide when to flip the
       // overlay window out of click-through mode.
-      invoke("report_bounds", { character, bounds }).catch(() => {});
+      invoke("report_bounds", {
+        windowLabel,
+        character,
+        bounds,
+      }).catch(() => {});
 
       // Bubble state machine — errors trump everything else.
       const currentErr = errorRef.current;
@@ -236,7 +267,14 @@ export default function Character(props: Props) {
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character, trackLeft, trackRight, trackBottom, initialFraction]);
+  }, [
+    character,
+    windowLabel,
+    trackLeft,
+    trackRight,
+    trackBottom,
+    initialFraction,
+  ]);
 
   const sheetW = SHEET_COLS * DISPLAY_WIDTH;
   const sheetH = SHEET_ROWS * DISPLAY_HEIGHT;
@@ -253,6 +291,7 @@ export default function Character(props: Props) {
           height: DISPLAY_HEIGHT,
           willChange: "transform",
           pointerEvents: "none",
+          overflow: "visible",
         }}
       >
         <div
@@ -274,7 +313,11 @@ export default function Character(props: Props) {
               left: "50%",
               transform: "translateX(-50%)",
               display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
               gap: 8,
+              width: "max-content",
+              maxWidth: "min(100vw - 24px, 420px)",
               pointerEvents: "auto",
               zIndex: 10,
             }}

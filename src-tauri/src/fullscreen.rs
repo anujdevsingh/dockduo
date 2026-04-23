@@ -14,6 +14,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::config;
+use crate::hit_test::OVERLAY_WINDOW_LABELS;
 
 #[cfg(windows)]
 const POLL_INTERVAL_MS: u64 = 1000;
@@ -42,9 +43,12 @@ fn poll_loop<R: Runtime>(app: AppHandle<R>) {
             // Setting disabled — if we previously hid, restore; otherwise
             // leave the overlay alone.
             if we_hid_it {
-                if let Some(win) = app.get_webview_window("overlay") {
-                    let _ = win.show();
+                for label in OVERLAY_WINDOW_LABELS {
+                    if let Some(win) = app.get_webview_window(label) {
+                        let _ = win.show();
+                    }
                 }
+                crate::bubble::show_all(&app);
                 we_hid_it = false;
             }
             continue;
@@ -66,16 +70,26 @@ fn poll_loop<R: Runtime>(app: AppHandle<R>) {
             || state == QUNS_RUNNING_D3D_FULL_SCREEN
             || state == QUNS_PRESENTATION_MODE;
 
-        let Some(win) = app.get_webview_window("overlay") else {
+        let Some(primary) = app.get_webview_window("overlay") else {
             continue;
         };
-        let currently_visible = win.is_visible().unwrap_or(true);
+        let currently_visible = primary.is_visible().unwrap_or(true);
 
         if is_fullscreen && currently_visible {
-            let _ = win.hide();
+            for label in OVERLAY_WINDOW_LABELS {
+                if let Some(w) = app.get_webview_window(label) {
+                    let _ = w.hide();
+                }
+            }
+            crate::bubble::hide_all(&app);
             we_hid_it = true;
-        } else if !is_fullscreen && !currently_visible && we_hid_it {
-            let _ = win.show();
+        } else if !is_fullscreen && we_hid_it {
+            for label in OVERLAY_WINDOW_LABELS {
+                if let Some(w) = app.get_webview_window(label) {
+                    let _ = w.show();
+                }
+            }
+            crate::bubble::show_all(&app);
             we_hid_it = false;
         }
     }
@@ -92,8 +106,10 @@ pub fn set_hide_on_fullscreen<R: Runtime>(
     // If the user just turned it off and we were hiding the overlay,
     // show it immediately so they don't have to wait for the next poll.
     if !enabled {
-        if let Some(win) = app.get_webview_window("overlay") {
-            let _ = win.show();
+        for label in OVERLAY_WINDOW_LABELS {
+            if let Some(win) = app.get_webview_window(label) {
+                let _ = win.show();
+            }
         }
     }
     Ok(())

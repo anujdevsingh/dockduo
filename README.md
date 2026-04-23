@@ -5,10 +5,9 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078d4)](https://github.com/anujdevsingh/dockduo/releases/latest)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB)](https://tauri.app)
 
-**Two animated pixel-art characters — Bruce and Jazz — that live on your Windows taskbar and open your AI coding CLI in a single click.**
+![DockDuo — Bruce and Jazz above the Windows taskbar](readme-hero.png)
 
-<!-- DEMO_GIF: drop demo.gif here (recorded with ScreenToGif, ~5 s loop) -->
-<!-- ![DockDuo demo](demo.gif) -->
+**Two animated pixel-art characters — Bruce and Jazz — that live on your Windows taskbar and talk to **Claude Code**, **OpenAI Codex**, and **Google Gemini** through a floating chat bubble.**
 
 DockDuo is the Windows port of Ryan Stephen's macOS
 [`lil-agents`](https://github.com/ryanstephen/lil-agents). MIT-licensed, no
@@ -19,24 +18,30 @@ telemetry, no cloud, no account, no phoning home. About 25 MB on disk,
 
 ## Quick install
 
-Download **[`DockDuo_0.1.0_x64-setup.exe`](https://github.com/anujdevsingh/dockduo/releases/latest)** → double-click → accept the SmartScreen prompt once → done.
+Download **`DockDuo_0.2.1_x64-setup.exe`** from the [**Releases**](https://github.com/anujdevsingh/dockduo/releases/latest) page (or the newest installer listed there) → double-click → accept the SmartScreen prompt once → done.
 
 No admin required. Installs per-user to `%LOCALAPPDATA%\Programs\DockDuo\`.
+
+### What's new in v0.2.1
+
+- **Bubble chat** — Click a character to open a **floating chat window** above the sprite (lil-style). All three agents — **Claude**, **Codex**, and **Gemini** — use the same warm transcript UI. No separate raw-terminal window inside the app.
+- **Agent picker** — If more than one CLI is installed, choose which agent to chat with. With only one CLI, the bubble opens immediately.
+- **Session-friendly UX** — Closing the bubble **does not** kill the chat session; click again to continue. **End session** in the bubble clears the backend session when you want a fresh start.
+- **Thinking indicator** — Animated dots while the model is working; the sprite still shows rotating **thinking phrases** and **completion** celebrations when the CLI goes idle.
+- **Safer agent spawns** — Sandboxed working directories under `%APPDATA%\DockDuo\agents\`, hardened Windows `.cmd` shim handling, and stricter IPC validation (see `docs/DECISIONS.md` if you care about the details).
+- **In-app updates** when using signed release builds.
+- **Multi-monitor** taskbar overlays are still deferred — see `docs/DECISIONS.md` D-011.
 
 ---
 
 ## What it does
 
 - Two sprite characters walk back and forth just above your taskbar.
-- **Click Bruce** → opens **Claude Code** in a new terminal window.
-- **Click Jazz** → opens **Codex** or **Gemini** (your pick during onboarding
-  or in the tray menu).
-- While the CLI is running, the character shows a thinking bubble cycling
-  through **44 rotating phrases** ("hmm...", "cooking...", "triangulating",
-  "consulting the oracle", …).
-- When the CLI exits, the character **celebrates** with one of 14 completion
-  phrases ("done!", "ship it", "ta-da!") and a soft chime plays.
-- **`Ctrl+Shift+L`** hides or shows the whole overlay instantly.
+- **Click a character** → if several CLIs are installed, pick **Claude**, **Codex**, or **Gemini** → a **chat bubble** opens above them. The walk animation **pauses** until you close the bubble (`Esc`, **×**, or click the sprite again).
+- **Type in the bubble** — messages run the real CLI on your PC; replies stream into the transcript. Click the same agent again to keep the conversation; switch agents to start a new session for that character.
+- While the CLI is running, the character can show a thinking bubble cycling through **rotating phrases** ("hmm...", "cooking...", …).
+- When the CLI exits, the character **celebrates** with completion phrases and a soft chime.
+- **`Ctrl+Shift+L`** hides or shows all overlay windows instantly.
 
 ---
 
@@ -54,9 +59,7 @@ auto-detects them at launch and re-checks when you open the agent picker.
 If a CLI isn't installed yet, the onboarding screen shows you the exact
 install command and re-checks after you've run it.
 
-> DockDuo never reads your CLI's prompts, its output, or its auth tokens. It
-> spawns the binary in a new, fully detached `cmd.exe` window and watches
-> only the OS process handle to know when you're done.
+> DockDuo runs your installed CLI as a local subprocess and shows its output in the chat bubble. It does not send your prompts or replies to DockDuo’s servers — there are none.
 
 ---
 
@@ -64,7 +67,7 @@ install command and re-checks after you've run it.
 
 1. Go to the
    [Releases page](https://github.com/anujdevsingh/dockduo/releases/latest)
-   and download `DockDuo_0.1.0_x64-setup.exe`.
+   and download the latest `DockDuo_*_x64-setup.exe`.
 2. Double-click it. No admin prompt — it installs per-user to
    `%LOCALAPPDATA%\Programs\DockDuo\`.
 3. Launch DockDuo from the Start menu. The onboarding window walks you
@@ -72,19 +75,17 @@ install command and re-checks after you've run it.
 
 ### Windows SmartScreen warning
 
-DockDuo is not code-signed for v0.1.0 (EV certificates cost ~$300/yr and the
-project is currently free). On first launch you will see:
+Unsigned (or newly signed) installers often trigger SmartScreen. On first launch you may see:
 
 > **Windows protected your PC**
 > Microsoft Defender SmartScreen prevented an unrecognized app from starting.
 
-This is expected. To run anyway:
+This is common for indie tools. To run anyway:
 
 1. Click **More info** (small text under the message).
 2. Click **Run anyway** (button that appears after "More info").
 
-You only need to do this once. Signing is on the roadmap once the project
-crosses ~500 downloads or picks up a sponsor.
+You may only need to do this once per installer. EV code signing is on the roadmap as the project grows.
 
 ---
 
@@ -94,7 +95,7 @@ crosses ~500 downloads or picks up a sponsor.
 2. Pick a provider for Bruce, pick a provider for Jazz. You can choose the
    same CLI for both if you want.
 3. Hit **Get started**. The window closes and the characters start walking.
-4. A tray icon appears in your system tray with all the same controls.
+4. A tray icon appears in your system tray with theme and update controls.
 
 ---
 
@@ -102,7 +103,7 @@ crosses ~500 downloads or picks up a sponsor.
 
 | Shortcut        | Action                            |
 | --------------- | --------------------------------- |
-| `Ctrl+Shift+L`  | Toggle the whole overlay on / off |
+| `Ctrl+Shift+L`  | Toggle all taskbar overlays on / off |
 
 ---
 
@@ -112,13 +113,13 @@ Right-click the DockDuo tray icon for:
 
 - **Show / Hide DockDuo** — same as `Ctrl+Shift+L`
 - **Theme** — Midnight · Daylight · Pastel · Retro (live switch, no restart)
-- **Start with Windows** — per-user registry entry, no admin needed
-- **Hide on fullscreen** — auto-hides when a fullscreen app takes focus
-  (games, videos)
-- **Check for updates…** — disabled in v0.1.0; re-enabled in v0.1.1 once the
-  updater signing keypair ships
-- **About DockDuo 0.1.0**
+- **Start with Windows** — per-user autostart, no admin needed
+- **Hide on fullscreen** — auto-hides when a fullscreen app takes focus (games, videos)
+- **Check for updates…** — GitHub Releases (signed release builds)
+- **About DockDuo** (version from `Cargo.toml`)
 - **Quit**
+
+Chat is always from the **sprite + bubble** — there is no separate “terminal mode” submenu.
 
 ---
 
@@ -128,8 +129,8 @@ Right-click the DockDuo tray icon for:
 - **WebView2:** auto-installed by the bundled bootstrapper if missing
 - **Disk:** ~25 MB installed
 - **RAM:** ~50 MB idle
-- **Display:** any; multi-monitor is supported but primary-taskbar only in
-  v0.1.0
+- **Display:** any; primary-taskbar monitor only (multi-monitor deferred —
+  see `docs/DECISIONS.md` D-011)
 
 ---
 
@@ -138,12 +139,10 @@ Right-click the DockDuo tray icon for:
 - **No telemetry.** DockDuo does not send analytics, crash reports, or usage
   stats anywhere — there is no backend.
 - **No cloud, no account, no sign-in.** Everything is local.
-- **Only outgoing connection:** the updater check against the GitHub
-  Releases page. This is currently **disabled** and ships off in v0.1.0.
-- **Your CLI's data stays yours.** DockDuo launches the CLI as a detached
-  child process in a new terminal window — it cannot read the stdio of that
-  process.
-- Config and logs stay in `%APPDATA%\DockDuo\`; nothing leaves your machine.
+- **Only outgoing connection:** the optional updater check against GitHub
+  Releases when you click **Check for updates…** (requires a signed build).
+- **Your CLI’s traffic is between you and the provider** (Anthropic, OpenAI, Google) — same as running the CLI in a terminal yourself.
+- Config, logs, and per-character agent sandboxes stay under `%APPDATA%\DockDuo\`; nothing is uploaded by DockDuo.
 
 ---
 
@@ -153,6 +152,7 @@ DockDuo writes config and logs under your user profile only:
 
 - **Config:** `%APPDATA%\DockDuo\config.json`
 - **Logs:** `%APPDATA%\DockDuo\logs\DockDuo.log`
+- **Agent sandboxes (CLI default cwd for tool use):** `%APPDATA%\DockDuo\agents\bruce\` and `…\jazz\`
 
 Uninstalling removes the install dir. If you want a full wipe, also delete
 `%APPDATA%\DockDuo\`.
@@ -183,15 +183,19 @@ The installer lands in `src-tauri/target/release/bundle/nsis/`.
 ### Project layout
 
 ```
-src/                  React 19 / TypeScript frontend (overlay + onboarding)
-src-tauri/src/        Rust backend (windows, tray, CLI spawning, config)
-src-tauri/icons/      App icons (all sizes)
-public/sprites/       Sprite sheets for Bruce and Jazz (150 frames each)
-public/sounds/        Completion chimes
-scripts/              Sprite conversion helpers (FFmpeg + sharp)
-docs/DockDuo-BuildPlan.md    Canonical build plan (phases 1–6)
-docs/DECISIONS.md            Architectural divergences from upstream (D-001 … D-009)
-.github/workflows/           CI build + tag-driven release pipelines
+src/                         React 19 / TypeScript (overlay, onboarding, AgentChat bubble)
+src-tauri/src/               Rust backend (windows, tray, config, CLI integration)
+src-tauri/src/bubble.rs      Chat bubble window show/hide + positioning
+src-tauri/src/chat/          Claude / Codex / Gemini pipes + session commands
+src-tauri/src/binary_resolve.rs   Locate claude / codex / gemini on Windows
+src-tauri/icons/             App icons (all sizes)
+public/sprites/              Sprite sheets for Bruce and Jazz
+public/sounds/               Completion chimes
+scripts/                     Sprite conversion helpers (FFmpeg + sharp)
+readme-hero.png              README screenshot (commit this file beside README.md)
+docs/DockDuo-BuildPlan.md    Canonical build plan
+docs/DECISIONS.md            Architectural notes (D-001 …)
+.github/workflows/           CI build + release pipelines
 ```
 
 ---
@@ -199,49 +203,30 @@ docs/DECISIONS.md            Architectural divergences from upstream (D-001 … 
 ## FAQ
 
 **Does it work offline?**
-Yes. Overlay, animations, and CLI spawning are 100% local. The CLI you
-launch (Claude / Codex / Gemini) needs its own internet; that's on it, not
-on DockDuo.
+The overlay works offline. The AI CLI you use needs network for the provider; that is unchanged from running the CLI yourself.
 
 **Can I use a CLI that isn't in the list?**
-Not in v0.1.0 — the three providers are hardcoded in `claude.rs`. Custom
-providers are on the roadmap (v0.3.0).
+Not in v0.2.x — the three providers are wired in code. Custom providers are on the roadmap (see below).
 
 **Why two characters instead of one?**
-It matches the upstream macOS app — one slot per "primary" agent so you can
-split workflows (e.g. Bruce for long-running Claude Code, Jazz for quick
-Codex runs). You can always point both at the same CLI if you prefer.
+Same idea as upstream lil-agents — e.g. Bruce for Claude, Jazz for Codex. You can point both at the same CLI if you like.
 
-**Why a new `cmd.exe` window instead of an embedded terminal?**
-See [`docs/DECISIONS.md`](docs/DECISIONS.md) D-003. Short version: Windows
-Terminal is already excellent for the job, bundling a PTY + xterm.js added
-~4 MB and a fragile IPC layer, and users liked having a real terminal they
-already knew. An embedded PTY remains an optional target for v0.2.0
-(D-009).
+**Will DockDuo read or log my prompts?**
+DockDuo streams subprocess output to paint the bubble. It does not send that text to DockDuo servers. Logs may contain CLI stderr lines; keep logs local if they ever include sensitive paths.
 
-**Will DockDuo read or log my prompts / CLI output?**
-No. DockDuo spawns the CLI as a detached child process in its own console —
-it has no handle on the child's stdio. It only knows when the process
-exits.
+**How does "Check for updates…" work?**
+Releases use the Tauri updater with a signed manifest. Unsigned local dev builds may not update — use a release installer to verify.
 
-**Why is "Check for updates…" disabled?**
-v0.1.0 ships without an updater signing keypair. Once the release signing
-flow is set up (v0.1.1), the tray button goes live and the app will check
-GitHub Releases on demand.
-
-**Why SmartScreen yells at me?**
-Because the installer isn't code-signed yet. See
-[Windows SmartScreen warning](#windows-smartscreen-warning) above.
+**Why SmartScreen warns me?**
+The installer may be unsigned or newly signed. See [Windows SmartScreen warning](#windows-smartscreen-warning) above.
 
 ---
 
 ## Roadmap
 
-- **v0.1.1** — Updater keypair + live "Check for updates" button
-- **v0.2.0** — Optional in-app PTY terminal via xterm.js (see D-003 / D-009)
-- **v0.2.0** — Multi-monitor taskbar detection fixes
-- **v0.3.0** — Custom-provider plugin (run any CLI, not just the three built-in)
-- **Later** — More character pairs, themeable sound packs, Linux port
+- **v0.2.x** — Polish, bugfixes, multi-monitor overlays (D-011)
+- **v0.3.0** — Custom-provider plugin (arbitrary CLI)
+- **Later** — More character pairs, themeable sound packs, Linux port, EV code signing
 
 ---
 

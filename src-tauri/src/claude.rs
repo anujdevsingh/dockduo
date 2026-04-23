@@ -11,7 +11,7 @@
 //! can reflect busy / completed / idle.
 
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::sync::Mutex;
 
 #[cfg(windows)]
@@ -27,13 +27,16 @@ use tauri::{AppHandle, Emitter, Runtime};
 #[cfg(windows)]
 const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
 
-/// Win32 CREATE_NO_WINDOW — suppresses the console flash when probing
-/// for CLI installs via `where.exe`.
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-/// One child process per character slot.
+/// One child process per character slot (detached-console mode).
 static ACTIVE: Lazy<Mutex<HashMap<String, u32>>> = Lazy::new(Default::default);
+
+/// True when the given character already has a detached `cmd.exe` session.
+pub fn agent_slot_occupied_by_detached(character: &str) -> bool {
+    ACTIVE
+        .lock()
+        .map(|g| g.contains_key(character))
+        .unwrap_or(false)
+}
 
 /// Which coding-agent CLI to launch. Serialized to/from the frontend
 /// so the picker bubble can round-trip the user's choice.
@@ -46,7 +49,7 @@ pub enum AgentKind {
 }
 
 impl AgentKind {
-    fn binary(self) -> &'static str {
+    pub(crate) fn binary(self) -> &'static str {
         match self {
             AgentKind::Claude => "claude",
             AgentKind::Codex => "codex",
@@ -92,45 +95,9 @@ fn emit_status<R: Runtime>(app: &AppHandle<R>, character: &str, status: &str) {
     }
 }
 
-/// Try to find `<bin>` on this machine. Checks well-known Windows
-/// install locations first, then falls back to `where.exe <bin>` which
-/// walks PATH. Returns the absolute path if found.
-fn detect_binary(bin: &str) -> Option<String> {
-    let home = std::env::var("USERPROFILE").unwrap_or_default();
-    let candidates = [
-        format!("{home}\\.local\\bin\\{bin}.exe"),
-        format!("{home}\\.local\\bin\\{bin}.cmd"),
-        format!("{home}\\AppData\\Local\\Programs\\{bin}\\{bin}.exe"),
-        format!("{home}\\AppData\\Roaming\\npm\\{bin}.cmd"),
-        format!("{home}\\AppData\\Roaming\\npm\\{bin}.exe"),
-    ];
-    for p in &candidates {
-        if std::path::Path::new(p).exists() {
-            return Some(p.clone());
-        }
-    }
-
-    // PATH fallback via `where.exe`. Suppress the console flash.
-    let mut cmd = Command::new("where");
-    cmd.arg(bin)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    #[cfg(windows)]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-
-    if let Ok(output) = cmd.output() {
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Some(first) = stdout.lines().next() {
-                let trimmed = first.trim();
-                if !trimmed.is_empty() {
-                    return Some(trimmed.to_string());
-                }
-            }
-        }
-    }
-    None
+/// Resolve an installed agent executable path (shared with `pty` / `chat`).
+pub(crate) fn detect_binary(bin: &str) -> Option<String> {
+    crate::binary_resolve::detect_agent_binary(bin)
 }
 
 /// List every coding-agent CLI currently installed on this machine.
@@ -208,6 +175,9 @@ pub fn spawn_agent<R: Runtime>(
         if active.contains_key(&character) {
             return Err(format!("already running for '{character}'"));
         }
+    }
+    if crate::chat::has_any_chat_session(&character) {
+        return Err(format!("already running for '{character}'"));
     }
 
     let agent_path = detect_binary(kind.binary())

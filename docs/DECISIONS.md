@@ -190,6 +190,77 @@ satisfied; "themed" is the piece we're explicitly accepting as a gap.
 
 ---
 
+## D-010 · v0.2.0: optional embedded PTY + xterm, multi-monitor overlays, signed updater
+
+**Plan section:** v0.2.0 release scope (embedded terminal, multi-monitor,
+updater).
+**Decision:** v0.2.0 ships the optional embedded path behind
+`config.use_embedded_terminal` (default **false**): `src-tauri/src/pty.rs`
+drives `portable-pty` sessions wired to `terminal_bruce` / `terminal_jazz`
+webviews with `@xterm/xterm` + Fit + WebGL; `claude.rs::spawn_agent` remains
+the system-default detached-console implementation when the flag is off
+(D-003 unchanged). Multi-monitor support uses `taskbar::current_all()` plus
+multiple overlay window labels (`overlay`, `overlay_1`, …) and
+`hit_test::report_bounds(window_label, …)` so each monitor's webview tracks
+its own character bounds. The Tauri updater is **active** with a published
+public key in `tauri.conf.json`; private signing material lives only in
+GitHub Actions secrets / maintainer machines.
+**Relationship to earlier decisions:** D-009's deferral is **closed** for
+users who opt in via the tray or config. D-003 remains the default spawn
+path until the project chooses to flip the default after dogfooding. D-005's
+themes now also feed xterm `ITheme` objects when embedded mode is used.
+**Trade-offs:** Larger JS bundle when the embedded terminal chunk loads;
+ConPTY requires Windows 10 1809+; CLIs that print continuous heartbeats may
+keep the bubble in `busy` longer than ideal (same class of limitation noted
+under D-003).
+**Reversibility:** Setting `use_embedded_terminal` to false restores v0.1.x
+behavior without removing the PTY code path.
+
+---
+
+## D-011 · Multi-monitor taskbar overlays deferred out of v0.2.0
+
+**Plan section:** v0.2.0 Phase E (multi-monitor taskbar overlays).
+**Decision:** v0.2.0 ships primary-taskbar only. `overlay_1` / `overlay_2`
+webviews and the `Shell_SecondaryTrayWnd` enumeration in `taskbar.rs` were
+removed before release. `OVERLAY_WINDOW_LABELS` is now the single-element
+slice `&["overlay"]` (kept as a slice so a future reintroduction can add
+labels without touching `tray.rs` / `fullscreen.rs` / `hit_test.rs`).
+**Why:** On single-monitor Windows 11, `EnumWindows` returned phantom
+`Shell_SecondaryTrayWnd` instances even after filtering for
+`IsWindowVisible`. The result was Bruce and Jazz doubling or tripling on
+screen after alt-tab / focus changes — the secondary overlay windows were
+reappearing via Windows' default restore behavior. Reliable single-monitor
+behavior is the higher priority for this release.
+**What's preserved:** `hit_test::report_bounds(window_label, character,
+bounds)` keeps its composite key; `Character.tsx` still passes
+`windowLabel`. This means re-enabling multi-monitor later only requires:
+adding window definitions back to `tauri.conf.json`, extending
+`OVERLAY_WINDOW_LABELS`, restoring `current_all` + positioning fan-out.
+**Trade-off:** Users on multi-monitor setups see characters only on the
+primary-taskbar monitor — identical to v0.1.0 behavior.
+**Reversibility:** High. No schema changes, no public-API churn.
+
+---
+
+## D-012 · Embedded UI: Raw (xterm + PTY) vs Chat (lil-style pipes)
+
+**Plan section:** lil-agents chat parity spec
+(`docs/superpowers/specs/2026-04-22-lil-agents-chat-parity-design.md`).
+**Decision:** When `use_embedded_terminal` is true, `embedded_ui_mode` selects
+either **Raw** (existing ConPTY + xterm.js) or **Chat** (transcript UI + Claude
+Code `stream-json` over stdin/stdout). The tray **Terminal** submenu offers
+three choices: system console, embedded raw, embedded chat. Codex/Gemini in
+chat mode return an explicit error until dedicated pipe drivers exist.
+**Why:** Upstream lil-agents is chat-first; many users prefer a transcript over
+a full TTY. Reusing the same `terminal_*` windows avoids new Tauri labels.
+**Trade-offs:** Chat mode uses the same permission-skipping flags as the
+reference headless Claude invocation; only Claude is fully wired in v1.
+**Reversibility:** Both modes are config-gated; system-terminal behavior is
+unchanged.
+
+---
+
 ## How to amend this log
 
 Each new decision gets a new top-level `## D-NNN` entry with:

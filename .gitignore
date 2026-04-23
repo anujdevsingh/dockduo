@@ -51,4 +51,17 @@ src-tauri/target/release/bundle/
 
 # graphify knowledge-graph artifacts (regenerable via /graphify .)
 graphify-out/
+docs/project-graph/
 .graphify_*
+
+# Secrets and machine-local env (never commit API keys)
+.env
+.env.*
+
+# One-off local reports / agent dumps (not part of the product)
+DOCKDUO_PROJECT_FULL_REPORT.txt
+
+# Windows junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini

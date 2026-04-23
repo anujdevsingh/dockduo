@@ -14,7 +14,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 /// Current on-disk schema. Bump + migrate if fields are renamed/removed.
-const CONFIG_VERSION: u32 = 1;
+const CONFIG_VERSION: u32 = 5;
 
 /// Supported visual themes. Maps 1:1 to CSS variable bundles on the frontend.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -33,6 +33,7 @@ impl Default for Theme {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppConfig {
     pub version: u32,
     pub theme: Theme,
@@ -94,14 +95,16 @@ fn read_from_disk() -> Result<AppConfig> {
     }
     let raw = fs::read_to_string(&path)
         .with_context(|| format!("reading {}", path.display()))?;
+    // Parse leniently: the bubble-only migration dropped
+    // `use_embedded_terminal` and `embedded_ui_mode`. `#[serde(default)]` on
+    // the struct lets us ignore any extras the old binary left behind.
     let cfg: AppConfig = serde_json::from_str(&raw)
         .with_context(|| format!("parsing {}", path.display()))?;
     Ok(migrate(cfg))
 }
 
-/// Migrate older schemas to the current one. No-op today; grows as the
-/// schema evolves.
-fn migrate(cfg: AppConfig) -> AppConfig {
+/// Migrate older schemas to the current one.
+fn migrate(mut cfg: AppConfig) -> AppConfig {
     if cfg.version == CONFIG_VERSION {
         return cfg;
     }
@@ -110,10 +113,8 @@ fn migrate(cfg: AppConfig) -> AppConfig {
         to = CONFIG_VERSION,
         "config schema migrated"
     );
-    AppConfig {
-        version: CONFIG_VERSION,
-        ..cfg
-    }
+    cfg.version = CONFIG_VERSION;
+    cfg
 }
 
 /// Atomic-write the config. Writes to `<path>.tmp` and renames, so a

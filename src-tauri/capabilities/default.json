@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the overlay + onboarding windows",
-  "windows": ["overlay", "onboarding"],
+  "description": "Capability for the overlay, onboarding, and per-character chat bubble windows",
+  "windows": ["overlay", "onboarding", "bubble_bruce", "bubble_jazz"],
   "permissions": [
     "core:default",
     "core:window:allow-set-ignore-cursor-events",

@@ -1,6 +1,6 @@
 //! System tray icon + menu.
 //!
-//! Phase 4 tray menu:
+//! Tray menu:
 //!   • Show / Hide DockDuo  (toggles overlay; also on tray left-click)
 //!   • Theme  ▸  Midnight · Daylight · Pastel · Retro   (live switch)
 //!   • Start with Windows  (checkbox, backed by autostart plugin)
@@ -21,6 +21,7 @@ use tauri::{
     App, AppHandle, Emitter, Manager, Runtime,
 };
 
+use crate::hit_test::OVERLAY_WINDOW_LABELS;
 use crate::{autostart, config::{self, Theme}, updater};
 
 const MENU_ID_TOGGLE: &str = "toggle_overlay";
@@ -131,7 +132,6 @@ pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
         ],
     )?;
 
-    // Keep refs so on_menu_event can toggle checks without re-building.
     let t_midnight_c = t_midnight.clone();
     let t_daylight_c = t_daylight.clone();
     let t_pastel_c = t_pastel.clone();
@@ -169,25 +169,22 @@ pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
                 sync_theme_checks(&t_midnight_c, &t_daylight_c, &t_pastel_c, &t_retro_c, Theme::Retro);
             }
             MENU_ID_HIDE_FS => {
-                // Flip based on current checkbox state.
                 let want = hide_fs_c.is_checked().unwrap_or(true);
                 if let Err(e) = config::set_hide_on_fullscreen(want) {
                     tracing::warn!(error = %e, "persist hide_on_fullscreen failed");
                 }
-                // If the user turned it off, show the overlay right away.
                 if !want {
-                    if let Some(win) = app.get_webview_window("overlay") {
-                        let _ = win.show();
+                    for label in OVERLAY_WINDOW_LABELS {
+                        if let Some(win) = app.get_webview_window(label) {
+                            let _ = win.show();
+                        }
                     }
                 }
             }
             MENU_ID_AUTOSTART => {
-                // `is_checked` reflects the post-click state.
                 let want = autostart_c.is_checked().unwrap_or(false);
                 match autostart::set_autostart(app.clone(), want) {
                     Ok(actual) => {
-                        // If the plugin disagreed (e.g. registry write
-                        // denied), re-sync the checkbox to reality.
                         if actual != want {
                             let _ = autostart_c.set_checked(actual);
                         }
@@ -195,7 +192,6 @@ pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
                     }
                     Err(e) => {
                         tracing::warn!(error = %e, "autostart toggle failed");
-                        // Revert the checkbox — the write didn't land.
                         let _ = autostart_c.set_checked(!want);
                     }
                 }
@@ -247,13 +243,18 @@ pub fn build<R: Runtime>(app: &App<R>) -> Result<()> {
 
 /// Flip the overlay's visibility. Shared by tray menu, tray click, hotkey.
 pub fn toggle_overlay<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
-    let Some(win) = app.get_webview_window("overlay") else {
+    let Some(primary) = app.get_webview_window("overlay") else {
         return Ok(());
     };
-    if win.is_visible().unwrap_or(true) {
-        win.hide()?;
-    } else {
-        win.show()?;
+    let show = !primary.is_visible().unwrap_or(true);
+    for label in OVERLAY_WINDOW_LABELS {
+        if let Some(w) = app.get_webview_window(label) {
+            if show {
+                w.show()?;
+            } else {
+                w.hide()?;
+            }
+        }
     }
     Ok(())
 }
@@ -262,7 +263,6 @@ fn pick_theme<R: Runtime>(app: &AppHandle<R>, theme: Theme) {
     if let Err(e) = config::set_theme(theme) {
         tracing::warn!(error = %e, "persist theme failed");
     }
-    // Tell every window to re-apply CSS vars. The overlay listens for this.
     let payload = match theme {
         Theme::Midnight => "midnight",
         Theme::Daylight => "daylight",

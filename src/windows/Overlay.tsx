@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import Character from "../components/Character";
 import { appStore, type AgentInfo } from "../store/appStore";
 import type { AiStatus, CharacterId } from "../lib/sprites";
@@ -16,17 +17,25 @@ interface TaskbarInfo {
   monitor_rect: [number, number, number, number];
 }
 
+type PausedMap = Record<CharacterId, boolean>;
+
 export default function Overlay() {
   const [tb, setTb] = useState<TaskbarInfo | null>(null);
+  const [paused, setPaused] = useState<PausedMap>({ bruce: false, jazz: false });
+
+  const overlayWindowLabel = useMemo(() => {
+    try {
+      return getCurrentWebviewWindow().label;
+    } catch {
+      return "overlay";
+    }
+  }, []);
 
   useEffect(() => {
-    // Load persisted theme on mount so the very first frame uses the
-    // user's chosen palette rather than the default Midnight.
     invoke<{ theme: ThemeId }>("get_config")
       .then((cfg) => applyTheme(cfg.theme))
       .catch((e) => console.warn("get_config failed", e));
 
-    // Tray menu emits this when the user picks a different theme.
     const unlistenTheme = listen<ThemeId>("theme-changed", (event) => {
       applyTheme(event.payload);
     });
@@ -39,7 +48,6 @@ export default function Overlay() {
       setTb(event.payload);
     });
 
-    // Real AI status events from the Rust side (claude process lifecycle).
     const unlistenAi = listen<{ character: CharacterId; status: AiStatus }>(
       "ai-status-changed",
       (event) => {
@@ -47,10 +55,25 @@ export default function Overlay() {
       },
     );
 
+    const unlistenPause = listen<{ character: CharacterId }>(
+      "sprite-walk-paused",
+      (event) => {
+        setPaused((p) => ({ ...p, [event.payload.character]: true }));
+      },
+    );
+    const unlistenResume = listen<{ character: CharacterId }>(
+      "sprite-walk-resumed",
+      (event) => {
+        setPaused((p) => ({ ...p, [event.payload.character]: false }));
+      },
+    );
+
     return () => {
       unlistenTb.then((un) => un());
       unlistenAi.then((un) => un());
       unlistenTheme.then((un) => un());
+      unlistenPause.then((un) => un());
+      unlistenResume.then((un) => un());
     };
   }, []);
 
@@ -59,25 +82,29 @@ export default function Overlay() {
   const W = typeof window !== "undefined" ? window.innerWidth : 1920;
   const H = typeof window !== "undefined" ? window.innerHeight : 200;
 
-  /**
-   * Spawn a specific agent for this character. Handles the benign
-   * "already running" dedupe silently; everything else shows a red
-   * error bubble.
-   */
-  const spawnWithAgent = async (character: CharacterId, agent: AgentInfo) => {
+  /** Sprite center-x in CSS pixels within the overlay window. */
+  const spriteCenterX = (character: CharacterId): number => {
+    const b = appStore.get().bounds[character];
+    if (!b) return W / 2;
+    return b.x + b.w / 2;
+  };
+
+  /** Open (or close) the chat bubble for this character with the chosen agent. */
+  const openBubble = async (character: CharacterId, agent: AgentInfo) => {
     try {
-      await invoke<number>("spawn_agent", {
+      await invoke("toggle_bubble", {
         character,
         kind: agent.kind,
+        spriteCenterX: spriteCenterX(character),
       });
     } catch (err) {
       const msg = typeof err === "string" ? err : String(err);
-      if (msg.toLowerCase().includes("already running")) {
-        console.info(`spawn_agent(${character}) dedupe:`, msg);
-        return;
-      }
-      console.warn(`spawn_agent(${character}) failed:`, msg);
-      appStore.setError(character, msg, 5000);
+      console.warn(`toggle_bubble(${character}) failed:`, msg);
+      appStore.setError(
+        character,
+        `Chat window failed to open: ${msg}`,
+        12_000,
+      );
     }
   };
 
@@ -85,15 +112,29 @@ export default function Overlay() {
    * Click handler for a character sprite.
    *
    *  - 0 agents installed → red error bubble asking the user to install one
-   *  - 1 agent installed  → spawn it immediately
+   *  - 1 agent installed  → open the bubble immediately (or close if open)
    *  - 2+ agents          → show a picker bubble; user picks by clicking
    */
   const onCharacterClick = async (character: CharacterId) => {
-    // If a picker is already showing for this character, a click on the
-    // sprite itself dismisses it. (Clicks on pills are handled inside
-    // Character.tsx via `onPickAgent`.)
     if (appStore.get().pickers[character]) {
       appStore.clearPicker(character);
+      return;
+    }
+
+    // Source of truth is the Rust side: does the bubble window exist?
+    // (Using local `paused` state can get stuck if toggle_bubble failed.)
+    let isOpen = false;
+    try {
+      isOpen = await invoke<boolean>("bubble_is_open", { character });
+    } catch (err) {
+      console.warn(`bubble_is_open(${character}) failed:`, err);
+    }
+    if (isOpen) {
+      try {
+        await invoke("close_bubble", { character });
+      } catch (err) {
+        console.warn(`close_bubble(${character}) failed:`, err);
+      }
       return;
     }
 
@@ -119,43 +160,44 @@ export default function Overlay() {
     }
 
     if (agents.length === 1) {
-      // Auto-spawn — priority order is already baked into list_agents.
-      await spawnWithAgent(character, agents[0]);
+      await openBubble(character, agents[0]);
       return;
     }
 
-    // Multiple agents present — let the user choose.
     appStore.setPicker(character, agents, 10000);
   };
 
   /** Called by Character.tsx when the user clicks a picker pill. */
   const onPickAgent = (character: CharacterId, agent: AgentInfo) => {
     appStore.clearPicker(character);
-    void spawnWithAgent(character, agent);
+    void openBubble(character, agent);
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none" }}>
       <Character
         character="bruce"
+        windowLabel={overlayWindowLabel}
         initialFraction={0.2}
         trackLeft={0}
         trackRight={W}
         trackBottom={H}
+        paused={paused.bruce}
         onClick={() => void onCharacterClick("bruce")}
         onPickAgent={(a) => onPickAgent("bruce", a)}
       />
       <Character
         character="jazz"
+        windowLabel={overlayWindowLabel}
         initialFraction={0.75}
         trackLeft={0}
         trackRight={W}
         trackBottom={H}
+        paused={paused.jazz}
         onClick={() => void onCharacterClick("jazz")}
         onPickAgent={(a) => onPickAgent("jazz", a)}
       />
 
-      {/* Debug badge removed — enable via VITE_DEBUG=1 if needed */}
       {import.meta.env.VITE_DEBUG === "1" && (
         <div
           style={{

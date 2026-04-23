@@ -12,12 +12,9 @@ use crate::taskbar::{TaskbarEdge, TaskbarInfo};
 const OVERLAY_HEIGHT_CSS: f64 = 200.0;
 
 pub fn configure_overlay_window(app: &App) -> Result<()> {
-    let window = app
-        .get_webview_window("overlay")
-        .ok_or_else(|| anyhow::anyhow!("overlay window not found"))?;
-
-    // Click-through by default; the frontend toggles this off when the
-    // cursor enters a character sprite.
+    let Some(window) = app.get_webview_window("overlay") else {
+        return Ok(());
+    };
     window.set_ignore_cursor_events(true)?;
 
     #[cfg(windows)]
@@ -29,8 +26,8 @@ pub fn configure_overlay_window(app: &App) -> Result<()> {
     #[cfg(windows)]
     force_transparent_webview(&window);
 
-    if let Ok(info) = crate::taskbar::current() {
-        if let Err(e) = position_above_taskbar(&window, &info) {
+    if let Ok(tb) = crate::taskbar::current() {
+        if let Err(e) = position_above_taskbar(&window, &tb) {
             tracing::warn!(error = %e, "initial overlay positioning failed");
         }
     }
